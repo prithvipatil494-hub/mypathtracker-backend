@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Path Tracker with Map</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .main-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 30px auto;
+    }
+
+    @media (max-width: 1024px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    .map-container {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+      display: none;
+    }
+
+    .map-container.active {
+      display: block;
+    }
+
+    #map {
+      width: 100%;
+      height: 600px;
+    }
+
+    @media (max-width: 1024px) {
+      #map {
+        height: 400px;
+      }
+    }
+    
+    h1 { 
+      color: #333; 
+      margin-bottom: 10px; 
+      text-align: center;
+      font-size: 28px;
+    }
+    
+    .subtitle { 
+      text-align: center; 
+      color: #666; 
+      margin-bottom: 30px; 
+      font-size: 14px; 
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 40px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: block;
+      margin: 10px auto;
+      transition: all 0.3s;
+      width: 100%;
+      max-width: 300px;
+    }
+    
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    button:disabled { 
+      opacity: 0.6; 
+      cursor: not-allowed; 
+    }
+    
+    .stop-btn { 
+      background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); 
+    }
+
+    .map-btn {
+      background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+      max-width: 200px;
+      padding: 12px 30px;
+      margin: 10px 5px;
+      display: inline-block;
+      width: auto;
+    }
+
+    .button-group {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 15px 0;
+    }
+    
+    .frequency-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 15px 0;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .freq-option {
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s;
+      font-weight: 500;
+      color: #666;
+      font-size: 13px;
+    }
+    
+    .freq-option:hover {
+      border-color: #667eea;
+      background: #f0f0ff;
+    }
+    
+    .freq-option.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .tracking-status {
+      background: #e8f5e9;
+      border: 2px solid #4caf50;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      display: none;
+    }
+    
+    .tracking-status.active { 
+      display: block; 
+    }
+    
+    .timer-display {
+      font-size: 48px;
+      font-weight: bold;
+      color: #4caf50;
+      text-align: center;
+      margin: 20px 0;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .stat-card {
+      background: #f7f9fc;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #667eea;
+      font-weight: 600;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .stat-value { 
+      font-size: 16px; 
+      color: #333;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    
+    .success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #4caf50;
+      animation: slideIn 0.3s ease;
+    }
+    
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #f5576c;
+      animation: slideIn 0.3s ease;
+    }
+    
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #ffc107;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .input-group {
+      margin: 20px 0;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #667eea;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    .input-group input:focus {
+      outline: none;
+      border-color: #764ba2;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    }
+    
+    #messageArea {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .leaflet-popup-content {
+      font-size: 12px;
+    }
+
+    .path-info {
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    h3 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <div class="container">
+      <h1>📍 Live Path Tracker</h1>
+      <p class="subtitle">Continuous location tracking with live map</p>
+
+      <div id="setupView">
+        <div class="input-group">
+          <label>User ID</label>
+          <input type="text" id="userId" placeholder="Enter your user ID">
+        </div>
+
+        <p style="text-align: center; margin: 20px 0 15px 0; font-weight: 600;">Update Frequency:</p>
+        <div class="frequency-selector">
+          <div class="freq-option" onclick="selectFrequency(5)">5 sec</div>
+          <div class="freq-option" onclick="selectFrequency(10)">10 sec</div>
+          <div class="freq-option selected" onclick="selectFrequency(15)">15 sec</div>
+        </div>
+
+        <button id="startBtn" onclick="startTracking()" disabled>🚀 Start Tracking</button>
+      </div>
+
+      <div class="tracking-status" id="trackingStatus">
+        <h3 style="color: #4caf50; text-align: center;">🔴 TRACKING ACTIVE</h3>
+        <div class="timer-display" id="timerDisplay">00:00</div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Session ID</div>
+            <div class="stat-value" id="sessionId">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Updates Sent</div>
+            <div class="stat-value" id="updateCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Current Latitude</div>
+            <div class="stat-value" id="currentLat">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Current Longitude</div>
+            <div class="stat-value" id="currentLng">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Accuracy (m)</div>
+            <div class="stat-value" id="accuracy">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Altitude (m)</div>
+            <div class="stat-value" id="altitude">--</div>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button class="map-btn" onclick="toggleMap()">🗺️ View Map</button>
+          <button class="stop-btn" onclick="stopTracking()">⏹ Stop</button>
+        </div>
+      </div>
+
+      <div id="messageArea"></div>
+    </div>
+
+    <div class="map-container" id="mapContainer">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = 'https://mypathtracker-io.vercel.app';
+    
+    let selectedFrequency = 15;
+    let timerInterval = null;
+    let startTime = null;
+    let updateCount = 0;
+    let watchId = null;
+    let currentSessionId = null;
+    let isTracking = false;
+    let locationBuffer = [];
+    let trackingLocations = [];
+    let map = null;
+    let pathPolyline = null;
+    let currentMarker = null;
+    const BATCH_SIZE = 10;
+    const TIMER_DURATION = 24 * 60 * 60 * 1000; // 24 hours default
+
+    function selectFrequency(seconds) {
+      selectedFrequency = seconds;
+      document.querySelectorAll('.freq-option').forEach(opt => opt.classList.remove('selected'));
+      event.target.classList.add('selected');
+    }
+
+    function updateStartButton() {
+      const userId = document.getElementById('userId').value.trim();
+      document.getElementById('startBtn').disabled = !userId;
+    }
+
+    document.getElementById('userId').addEventListener('input', updateStartButton);
+
+    function showMessage(message, type = 'success') {
+      const messageArea = document.getElementById('messageArea');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = type;
+      msgDiv.textContent = message;
+      messageArea.appendChild(msgDiv);
+      setTimeout(() => msgDiv.remove(), 6000);
+    }
+
+    async function apiCall(endpoint, method = 'GET', data = null) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      
+      if (data) {
+        options.body = JSON.stringify(data);
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}${endpoint}`, options);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        console.warn('API call failed:', error.message);
+        return null;
+      }
+    }
+
+    function initializeMap() {
+      if (map) return;
+
+      map = L.map('map').setView([20, 78], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+
+      pathPolyline = L.polyline([], {
+        color: '#667eea',
+        weight: 3,
+        opacity: 0.8,
+        smoothFactor: 1
+      }).addTo(map);
+    }
+
+    function updateMapWithLocation(lat, lng) {
+      if (!map) return;
+
+      trackingLocations.push([lat, lng]);
+      pathPolyline.setLatLngs(trackingLocations);
+
+      if (currentMarker) {
+        currentMarker.setLatLng([lat, lng]);
+      } else {
+        currentMarker = L.circleMarker([lat, lng], {
+          radius: 8,
+          fillColor: '#4caf50',
+          color: '#2e7d32',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(map)
+          .bindPopup(`<b>Current Location</b><br/>Lat: ${lat.toFixed(6)}<br/>Lng: ${lng.toFixed(6)}`);
+      }
+
+      map.fitBounds(pathPolyline.getBounds(), { padding: [50, 50] });
+    }
+
+    function toggleMap() {
+      const mapContainer = document.getElementById('mapContainer');
+      mapContainer.classList.toggle('active');
+
+      if (mapContainer.classList.contains('active')) {
+        setTimeout(() => {
+          if (map) {
+            map.invalidateSize();
+          } else {
+            initializeMap();
+          }
+        }, 100);
+      }
+    }
+
+    async function startTracking() {
+      if (!navigator.geolocation) {
+        showMessage('❌ Geolocation not supported by your browser', 'error');
+        return;
+      }
+
+      const userId = document.getElementById('userId').value.trim();
+
+      try {
+        const result = await apiCall('/api/session/start', 'POST', {
+          userId,
+          updateFrequency: selectedFrequency
+        });
+
+        if (result) {
+          currentSessionId = result.sessionId;
+        } else {
+          currentSessionId = 'LOCAL_' + Date.now();
+          showMessage('⚠️ Working in offline mode - data stored locally', 'warning');
+        }
+
+        document.getElementById('sessionId').textContent = currentSessionId.substring(0, 12) + '...';
+        
+        document.getElementById('setupView').style.display = 'none';
+        document.getElementById('trackingStatus').classList.add('active');
+        
+        isTracking = true;
+        startTime = Date.now();
+        updateCount = 0;
+        locationBuffer = [];
+        trackingLocations = [];
+        
+        // Initialize map
+        initializeMap();
+        
+        startTimer();
+        
+        // Continuous location tracking with high accuracy
+        watchId = navigator.geolocation.watchPosition(
+          handleLocationUpdate,
+          handleLocationError,
+          { 
+            enableHighAccuracy: true, 
+            timeout: 30000,
+            maximumAge: 0
+          }
+        );
+        
+        showMessage('✅ Tracking started - Updates every ' + selectedFrequency + ' seconds', 'success');
+      } catch (error) {
+        showMessage('❌ Error: ' + error.message, 'error');
+      }
+    }
+
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        
+        const hours = Math.floor(elapsed / 3600000);
+        const minutes = Math.floor((elapsed % 3600000) / 60000);
+        const seconds = Math.floor((elapsed % 60000) / 1000);
+        
+        document.getElementById('timerDisplay').textContent = 
+          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    function handleLocationUpdate(position) {
+      if (!isTracking) return;
+
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
+      const altitude = position.coords.altitude || 0;
+      const timestamp = new Date().toISOString();
+
+      // Update display
+      document.getElementById('currentLat').textContent = lat.toFixed(6);
+      document.getElementById('currentLng').textContent = lng.toFixed(6);
+      document.getElementById('accuracy').textContent = Math.round(accuracy);
+      document.getElementById('altitude').textContent = altitude > 0 ? Math.round(altitude) : 'N/A';
+
+      // Update map
+      updateMapWithLocation(lat, lng);
+
+      // Add to buffer
+      locationBuffer.push({
+        sessionId: currentSessionId,
+        latitude: lat,
+        longitude: lng,
+        accuracy: accuracy,
+        altitude: altitude,
+        timestamp: timestamp
+      });
+
+      // Auto-send when buffer reaches batch size
+      if (locationBuffer.length >= BATCH_SIZE) {
+        sendBatchUpdate();
+      }
+    }
+
+    async function sendBatchUpdate() {
+      if (locationBuffer.length === 0) return;
+
+      const batch = locationBuffer.splice(0, BATCH_SIZE);
+      
+      try {
+        await apiCall('/api/location/batch', 'POST', {
+          locations: batch
+        });
+        
+        updateCount += batch.length;
+        document.getElementById('updateCount').textContent = updateCount;
+        console.log('📤 Sent batch of ' + batch.length + ' location updates');
+      } catch (error) {
+        // Restore to buffer if failed
+        locationBuffer = batch.concat(locationBuffer);
+        console.error('Failed to send batch:', error);
+      }
+    }
+
+    function handleLocationError(error) {
+      console.error('Location error:', error);
+      if (error.code === error.PERMISSION_DENIED) {
+        showMessage('❌ Location permission denied', 'error');
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        showMessage('⚠️ Position unavailable - retrying...', 'warning');
+      }
+    }
+
+    async function stopTracking() {
+      clearInterval(timerInterval);
+      
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      
+      isTracking = false;
+
+      // Send remaining buffered locations
+      while (locationBuffer.length > 0) {
+        await sendBatchUpdate();
+      }
+
+      // Stop session on backend
+      if (currentSessionId) {
+        await apiCall(`/api/session/${currentSessionId}/stop`, 'POST');
+      }
+      
+      document.getElementById('setupView').style.display = 'block';
+      document.getElementById('trackingStatus').classList.remove('active');
+      document.getElementById('mapContainer').classList.remove('active');
+      updateStartButton();
+      
+      updateCount = 0;
+      currentSessionId = null;
+      locationBuffer = [];
+      trackingLocations = [];
+      
+      showMessage('✅ Tracking stopped - ' + updateCount + ' total updates sent', 'success');
+    }
+
+    updateStartButton();
+  </script>
+</body>
+</html>
